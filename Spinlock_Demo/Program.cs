@@ -32,21 +32,19 @@ namespace Spinlock_Debug
                         bool _lock = false;
                         for (int j = 0; j < 10_000; j++)
                         {
-                            //_spinLock.Enter(ref _lock);
+                            _spinLock.Enter(ref _lock);
                             Interlocked.Increment(ref count);
-                            lock (lockObj)
-                            {
-                                s += count + Environment.NewLine;
-                            }
-                            //Thread.SpinWait(0);
-                            //count++;
-                            //_spinLock.Exit();
+                            //若要打印或保存s，需要使用互斥锁以保证线程间的同步；此时的自旋锁反而会因为粒度过大导致不能起到很好的效果
+                            //lock (lockObj)
+                            //{
+                            //    s += count + Environment.NewLine;
+                            //}
+                            //Thread.SpinWait(0);//如果需要等待某个条件满足的时间很短，而且不希望发生上下文切换，基于自旋的【等待】是一种很好的解决方案。
+                            _spinLock.Exit();
                             _lock = false;
                         }
                     });
                 }
-                //System.Threading.SpinWait.SpinUntil(() => m_IsWork2Start);
-
                 Task.WaitAll(taskList);
                 sp.Stop();
                 Console.WriteLine($"完成! 耗时:{sp.ElapsedMilliseconds}");
