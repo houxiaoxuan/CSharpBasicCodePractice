@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReaderWriterLock_Demo2", "I
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReaderWriterLock_Demo1", "ReaderWriterLock_Demo1\ReaderWriterLock_Demo1.csproj", "{831C43B0-D85F-48FB-B1C5-40DDDDCA7408}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowsFormsApp1", "WindowsFormsApp1\WindowsFormsApp1.csproj", "{7BFB0F83-C5C4-4355-98EE-657409A63490}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,6 +53,10 @@ Global
 		{831C43B0-D85F-48FB-B1C5-40DDDDCA7408}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{831C43B0-D85F-48FB-B1C5-40DDDDCA7408}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{831C43B0-D85F-48FB-B1C5-40DDDDCA7408}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7BFB0F83-C5C4-4355-98EE-657409A63490}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7BFB0F83-C5C4-4355-98EE-657409A63490}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7BFB0F83-C5C4-4355-98EE-657409A63490}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7BFB0F83-C5C4-4355-98EE-657409A63490}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
