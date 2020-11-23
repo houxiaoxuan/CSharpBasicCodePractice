@@ -49,7 +49,7 @@ namespace MultiThread_Demo
             string data = "Default ";
             Func<int, string> func = new Func<int, string>(PrintThreadName_Int_Return_String);
             Thread t2 = new Thread(new ThreadStart(delegate { data+=func(111); }));
-            //Thread t2 = new Thread(new ThreadStart(delegate { new Func<int,string>(PrintThreadName_Int_Return_String)(111); }));//上两行写成一行
+            //Thread t2 = new Thread(new ThreadStart(delegate { data+=new Func<int,string>(PrintThreadName_Int_Return_String)(111); }));//上两行写成一行
             t2.Name = "t2";
             t2.Start();
             t2.Join();
@@ -71,7 +71,7 @@ namespace MultiThread_Demo
             Predicate<string> isT0 = new Predicate<string>(IsT0);//true如果obj满足此委托; 所表示的方法中定义的条件否则为false。
             List<string> T0 = lists.FindAll(isT0);
             //Func<string, bool> func0 =(ss)=>{ return  ss== "T0" ? true : false; };
-            List<string> T0_lambda = lists.FindAll((ss) => { return ss == "T0" ? true : false; });//lambda表达式写法
+            List<string> T0_lambda = lists.FindAll(ss => ss == "T0");//lambda表达式写法
 
             #endregion
 
