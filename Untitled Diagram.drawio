@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2021-01-09T09:08:41.088Z" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36" etag="yirxGi0T_2LJfI6ezFqT" version="14.1.8" type="github" pages="2">
+<mxfile host="app.diagrams.net" modified="2021-01-09T09:31:55.747Z" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36" etag="lBX8-GHz_rMPK-ZWrw4a" version="14.1.8" type="github" pages="3">
   <diagram name="V1" id="13e1069c-82ec-6db2-03f1-153e76fe0fe0">
     <mxGraphModel dx="1406" dy="745" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" background="#ffffff" math="0" shadow="0">
       <root>
@@ -565,11 +565,307 @@
         <mxCell id="J1Frwuy0Ud2jzfjdekxm-58" value="struct Instruction&lt;br&gt;{&lt;br&gt;&amp;nbsp; &amp;nbsp; string Request;&lt;br&gt;&amp;nbsp; &amp;nbsp; string PostiveResponse;&lt;br&gt;&amp;nbsp; &amp;nbsp; string NegativeResponse;&lt;br&gt;}" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;align=left;" parent="yun4vH86ktFeppTZLk79-1" vertex="1">
           <mxGeometry x="610" y="30" width="180" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="J1Frwuy0Ud2jzfjdekxm-59" value="&lt;div&gt;&lt;span&gt;问题一：&lt;/span&gt;&lt;br&gt;&lt;/div&gt;1.请求序列仅有一个TxQueue1，响应序列仅有一个RxQueue1，在&lt;span&gt;Task1执行CMD_Group时，指令请求（Task1将请求内容加入到TxQueue1）及响应（事件处理方法将event_args加入到RxQueue1）内容都由BackThread异步打印，会在视图上产生一个现象：第二条子指令的请求内容打印后，才会将第一条子指令的响应内容打印出来。&lt;/span&gt;&lt;br&gt;&lt;div&gt;——解决方法：加入一个缓存队列BufferTxQueue2，所有Task1将请求加入BufferTxQueue2，后台线程打印时先检查RxQueue1中的数量&lt;/div&gt;&lt;div&gt;&lt;div&gt;①若Rx队列数量大于0，则打印Rx内容，并将TxQueue1中的第一条（若存在，认为是该条对应的请求）取出（但不打印，已经打印过）并执行下一次循环&lt;span&gt;（Sleep(1)）&lt;/span&gt;&lt;span&gt;；&lt;/span&gt;&lt;/div&gt;&lt;div&gt;②若Rx队列数量为0（则表示无响应内容需要打印），则检查TxQueue1，若检查到数量为1，表示这一条在等待回复，继续下一次循环（Sleep(1)）；若数量等于0，则从&lt;span&gt;BufferTxQueue2取出一条（若存在）进行打印，并将该条加入到TxQueue1等待序列进行等待（等待收到响应后才会被取出），并执行下一次循环&lt;/span&gt;&lt;span&gt;（Sleep(1)）。&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;问题二（待验证，V3解决）：&lt;/div&gt;&lt;div&gt;2.用户点击两次不同按键发送不同指令，第一次Click1对应的Task1执行了一条耗时指令（比如2s后返回超时），第二次Click2对应的Task2执行了一条很快返回的指令（1s内），这种情况下上位机就会出现仅打印第二条响应的情况。&lt;/div&gt;&lt;div&gt;——解决方法：&lt;/div&gt;&lt;div&gt;①首先怀疑了是不是Lib和下位机未发送响应事件，调试后发现如背景3红字所示，即第二条指令是在第一条第一条超时后才发出，并且库中触发了两次事件，但上位机RxQueue中只有Taks2的消息（无Task1的超时消息）&lt;/div&gt;&lt;div&gt;②检查上位机代码后发现，可能由于第二条指令发送时，创建了Task2，和Task1公用了同一个线程同步标志，可能导致Task2收到响应后对Task1也释放（但站在背景3的角度上又说不过去，Task1应该先一步被释放才对，并且Task2在Task1未收到响应时，应该还卡在调用Lib库发送第二条指令的位置才对）&lt;/div&gt;&lt;div&gt;③基于②中的问题，协商后决定传入配置后，发送前先配置库，使其知道接下来要发送哪条子指令的序号，并在响应结果中将是哪条子指令的响应进行记录；同时，上位机亦在不同Task中使用不同的信号同步标志对其精确释放。（后续若Lib和下位机收发指令并解析实现异步，这也是一部分基础）&lt;/div&gt;" style="whiteSpace=wrap;html=1;shape=mxgraph.basic.document;align=left;" parent="yun4vH86ktFeppTZLk79-1" vertex="1">
-          <mxGeometry x="940" y="249" width="420" height="491" as="geometry" />
+        <mxCell id="J1Frwuy0Ud2jzfjdekxm-59" value="&lt;div&gt;&lt;span&gt;问题一：&lt;/span&gt;&lt;br&gt;&lt;/div&gt;1.请求序列仅有一个TxQueue1，响应序列仅有一个RxQueue1，在&lt;span&gt;Task1执行CMD_Group时，指令请求（Task1将请求内容加入到TxQueue1）及响应（事件处理方法将event_args加入到RxQueue1）内容都由BackThread异步打印，会在视图上产生一个现象：第二条子指令的请求内容打印后，才会将第一条子指令的响应内容打印出来。&lt;/span&gt;&lt;br&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;问题二（待验证，V3解决）：&lt;/div&gt;&lt;div&gt;2.用户点击两次不同按键发送不同指令，第一次Click1对应的Task1执行了一条耗时指令（比如2s后返回超时），第二次Click2对应的Task2执行了一条很快返回的指令（1s内），这种情况下上位机就会出现仅打印第二条响应的情况。&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;shape=mxgraph.basic.document;align=left;" parent="yun4vH86ktFeppTZLk79-1" vertex="1">
+          <mxGeometry x="940" y="249" width="420" height="231" as="geometry" />
         </mxCell>
         <mxCell id="TC0Mk5_eHuck5wyWeJz3-2" value="CMD_Group.Count&amp;gt;0" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" parent="yun4vH86ktFeppTZLk79-1" vertex="1">
           <mxGeometry x="241.5" y="620" width="130" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="EYqcfoZuNART3Exq2F5V" name="V3">
+    <mxGraphModel dx="1406" dy="745" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-0" />
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-1" parent="kwHOfy920-eHO_7U4Qhk-0" />
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-2" value="Par" style="shape=umlFrame;whiteSpace=wrap;html=1;fillColor=#CCCCCC;strokeColor=#808080;width=43;height=20;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="97.5" y="180" width="500" height="670" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-7" value="上下位机异步发送单条指令（多条报文）V3&lt;br&gt;（待验证）" style="shape=umlFrame;whiteSpace=wrap;html=1;strokeColor=#A3A3A3;fillColor=#CCCCCC;width=250;height=30;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="50" y="20" width="890" height="860" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-9" value="alt" style="shape=umlFrame;whiteSpace=wrap;html=1;fontColor=#333333;strokeColor=#A3A3A3;fillColor=#CCCCCC;width=50;height=20;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="250" y="290" width="290" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-3" value="" style="group" vertex="1" connectable="0" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="107.5" y="660" width="370" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-4" value="loop&amp;nbsp;" style="shape=umlFrame;whiteSpace=wrap;html=1;fontColor=#333333;strokeColor=#BDBDBD;fillColor=#CCCCCC;width=43;height=20;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-3">
+          <mxGeometry width="370" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-5" value="RxQueue.Count&amp;gt;0" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-3">
+          <mxGeometry x="-7.5" y="162.002691941193" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-6" value="alt" style="shape=umlFrame;whiteSpace=wrap;html=1;fillColor=#FFFFFF;width=40;height=20;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-3">
+          <mxGeometry x="52.5" y="32.4" width="300" height="127.6" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-8" value="loop" style="shape=umlFrame;whiteSpace=wrap;html=1;width=39;height=20;fillColor=#DBDBDB;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="290" y="360" width="160" height="270" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-11" value="CMD_View2&lt;br&gt;SyncEvent1/2...&lt;br&gt;BackThread" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="327.5" y="120" width="100" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-12" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-11">
+          <mxGeometry x="44" y="130" width="10" height="500" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-13" value="" style="group" vertex="1" connectable="0" parent="kwHOfy920-eHO_7U4Qhk-11">
+          <mxGeometry x="49" y="320" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-14" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-13">
+          <mxGeometry y="20" width="10" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-15" value="SyncEvent::Waitone()" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;entryX=1;entryY=0;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-13" target="kwHOfy920-eHO_7U4Qhk-14">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="5" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="30" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-16" value="CMD_View1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="177.5" y="120" width="102.5" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-17" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-16">
+          <mxGeometry x="45" y="100" width="10" height="590" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-18" value="[GetParingIndex()==ParsingIndex]" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-16">
+          <mxGeometry x="-23.5" y="596" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-19" value="CMDs_Setting&lt;br&gt;(Type:List&amp;lt;CMD_Setting&amp;gt;)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="467.5" y="120" width="100" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-20" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-19">
+          <mxGeometry x="44" y="100" width="10" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-21" value="Lib+COMM" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="627.5" y="120" width="100" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-22" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-21">
+          <mxGeometry x="44" y="160" width="10" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-23" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-21">
+          <mxGeometry x="44" y="290" width="10" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-24" value="DUT" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="767.5" y="120" width="100" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-25" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-24">
+          <mxGeometry x="44" y="309" width="10" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-26" value="CMD_Group" style="html=1;verticalAlign=bottom;endArrow=block;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;edgeStyle=elbowEdgeStyle;elbow=vertical;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="381.5" y="252" as="sourcePoint" />
+            <mxPoint x="510.5" y="252" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-27" value="" style="endArrow=open;endFill=1;endSize=6;html=1;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1" source="kwHOfy920-eHO_7U4Qhk-57">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="376.5" y="410.5" as="sourcePoint" />
+            <mxPoint x="671.5" y="410.5" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="516.5" y="410.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-28" value="AsyncExcuteCMD()" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="451.5" y="390" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-29" value="CMD_Group" style="html=1;verticalAlign=bottom;endArrow=block;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;edgeStyle=elbowEdgeStyle;elbow=vertical;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="222.5" y="221" as="sourcePoint" />
+            <mxPoint x="512" y="221" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-30" value="" style="endArrow=open;endFill=1;endSize=6;html=1;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="87.5" y="221" as="sourcePoint" />
+            <mxPoint x="227.5" y="221" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-31" value="Click1()、Task1" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="97.5" y="210" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-32" value="Click2()、Task2" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="97.5" y="250" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-33" value="" style="endArrow=open;endFill=1;endSize=6;html=1;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="87.5" y="251" as="sourcePoint" />
+            <mxPoint x="377" y="251" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="307.5" y="251" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-34" value="" style="group" vertex="1" connectable="0" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="376.5" y="370" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-35" value="SetSendingIndex()、Tasks[X]::SendCMD(Sub_CMD)、BufferTxQueue2::Enqueue()" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;entryX=1;entryY=0;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-34" target="kwHOfy920-eHO_7U4Qhk-57">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="5" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="30" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-36" value="" style="group" vertex="1" connectable="0" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="377.5" y="570" width="30" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-37" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-36">
+          <mxGeometry y="16.66" width="10" height="23.34" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-38" value="//HandleEvent()&lt;br&gt;SyncEvent::Set()、RxQueue::Enqueue(event_args)" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;entryX=1;entryY=0;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-36" target="kwHOfy920-eHO_7U4Qhk-37">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="5" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="30" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-39" value="&lt;span style=&quot;font-size: 12px&quot;&gt;event_args&lt;/span&gt;" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=6;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1" target="kwHOfy920-eHO_7U4Qhk-12">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="676.5" y="550" as="sourcePoint" />
+            <mxPoint x="596.5" y="550" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-40" value="" style="group" vertex="1" connectable="0" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="676.5" y="410" width="225" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-41" value="" style="endArrow=open;endFill=1;endSize=6;html=1;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-40">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="5" y="20" as="sourcePoint" />
+            <mxPoint x="140" y="20" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-42" value="Instruction.Request[SendingIndex]" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-40">
+          <mxGeometry x="10" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-43" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-40">
+          <mxGeometry y="80" width="10" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-44" value="PraseAndFliterResponse()、RaiseEvent()" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;entryX=1;entryY=0;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-40" target="kwHOfy920-eHO_7U4Qhk-43">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="5" y="60" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="30" y="60" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-45" value="&lt;span style=&quot;font-size: 12px&quot;&gt;Response(SendingIndex)&lt;/span&gt;" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=6;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-40" target="kwHOfy920-eHO_7U4Qhk-23">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="141" y="49.5" as="sourcePoint" />
+            <mxPoint x="61" y="49.5" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-46" value="" style="endArrow=open;dashed=1;endFill=0;endSize=6;html=1;labelBackgroundColor=none;exitX=-0.12;exitY=0.967;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1" source="kwHOfy920-eHO_7U4Qhk-22" target="kwHOfy920-eHO_7U4Qhk-20">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="812.5" y="300.27027027027026" as="sourcePoint" />
+            <mxPoint x="517.5" y="300.27027027027026" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-47" value="&lt;span style=&quot;font-size: 12px ; background-color: rgb(248 , 249 , 250)&quot;&gt;config_settings_rst&lt;/span&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="kwHOfy920-eHO_7U4Qhk-46">
+          <mxGeometry x="-0.3717" relative="1" as="geometry">
+            <mxPoint x="-24.799999999999997" y="-9.32" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-48" value="event_args" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;entryX=0.264;entryY=0.623;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="121.61000000000001" y="675.1700000000001" as="geometry">
+            <mxPoint x="370.5" y="752" as="sourcePoint" />
+            <mxPoint x="231.5633600000001" y="751.9959800000001" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-49" value="" style="group" vertex="1" connectable="0" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="228.56" y="757" width="19.08" height="43" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-50" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;fillColor=#FFFFFF;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-49">
+          <mxGeometry y="17.186232657417243" width="10.00234156843143" height="25.813767342582757" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-51" value="AsyncUpdateView2UI(event_args）" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;entryX=1;entryY=0;labelBackgroundColor=none;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-49" target="kwHOfy920-eHO_7U4Qhk-50">
+          <mxGeometry x="-301.1304952591966" y="-679.7854855923172" as="geometry">
+            <mxPoint x="4.941156734805124" y="-0.022945570971261625" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="19.08" />
+            </Array>
+            <mxPoint x="12" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-52" value="" style="endArrow=none;dashed=1;html=1;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="98.5" y="652" as="sourcePoint" />
+            <mxPoint x="600" y="652" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="467.5" y="652" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-53" value="SendCMDsSettings(Sub_CMD)" style="html=1;verticalAlign=bottom;endArrow=block;entryX=0;entryY=0;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;edgeStyle=elbowEdgeStyle;elbow=vertical;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry as="geometry">
+            <mxPoint x="521.5" y="280" as="sourcePoint" />
+            <mxPoint x="671.5" y="280" as="targetPoint" />
+            <mxPoint x="34" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-54" value="" style="endArrow=none;dashed=1;html=1;labelBackgroundColor=none;entryX=1.008;entryY=0.148;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1" target="kwHOfy920-eHO_7U4Qhk-9">
+          <mxGeometry x="119.5" y="265" width="50" height="50" as="geometry">
+            <mxPoint x="252" y="339" as="sourcePoint" />
+            <mxPoint x="570" y="332" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-55" value="else" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="250" y="340.0037837837839" width="40" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-56" value="[config_settings_rst==false]" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="250" y="310.00216216216216" width="160" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-57" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="376.5" y="384.30815789473684" width="10" height="41.05263157894737" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-58" value="AsyncUpdateView2UI(RxQueue::Dequeue(event_args))&lt;br&gt;AsyncUpdateView2UI(BufferTxQueue2::Dequeue())" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;labelBackgroundColor=none;exitX=0.95;exitY=0.4;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry y="2" as="geometry">
+            <mxPoint x="381" y="681" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="382" y="681" />
+              <mxPoint x="382" y="665" />
+              <mxPoint x="405" y="665" />
+              <mxPoint x="405" y="684" />
+            </Array>
+            <mxPoint x="382" y="684" as="targetPoint" />
+            <mxPoint x="39" y="-10" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-59" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;fillColor=#FFFFFF;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="376.5" y="675" width="10" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-60" value="" style="group" vertex="1" connectable="0" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="72.5" y="70" width="30" height="800" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-61" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;labelBackgroundColor=none;startFill=0;endArrow=none;endFill=0;endSize=6;dashed=1;" edge="1" parent="kwHOfy920-eHO_7U4Qhk-60">
+          <mxGeometry x="5" y="20.000000000000004" as="geometry">
+            <mxPoint x="15" y="800.0000000000001" as="targetPoint" />
+            <mxPoint x="15" y="100.00000000000001" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-62" value="Actor" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-60">
+          <mxGeometry width="30" height="78.00000000000001" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-63" value="struct CMD_Setting&lt;br&gt;{&lt;br&gt;&amp;nbsp; &amp;nbsp; string CMD_ID;&lt;br&gt;&amp;nbsp; &amp;nbsp; List&amp;lt;struct&amp;gt; Instruction;&lt;br&gt;}" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;align=left;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="451.5" y="30" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-64" value="struct Instruction&lt;br&gt;{&lt;br&gt;&amp;nbsp; &amp;nbsp; string Request;&lt;br&gt;&amp;nbsp; &amp;nbsp; string PostiveResponse;&lt;br&gt;&amp;nbsp; &amp;nbsp; string NegativeResponse;&lt;br&gt;}" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;align=left;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="610" y="30" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-65" value="&lt;div&gt;&lt;span&gt;问题一（已解决）：&lt;/span&gt;&lt;br&gt;&lt;/div&gt;1.请求序列仅有一个TxQueue1，响应序列仅有一个RxQueue1，在&lt;span&gt;Task1执行CMD_Group时，指令请求（Task1将请求内容加入到TxQueue1）及响应（事件处理方法将event_args加入到RxQueue1）内容都由BackThread异步打印，会在视图上产生一个现象：第二条子指令的请求内容打印后，才会将第一条子指令的响应内容打印出来。&lt;/span&gt;&lt;br&gt;&lt;div&gt;&lt;font color=&quot;#00ff00&quot;&gt;——解决方法：加入一个缓存队列BufferTxQueue2，所有Task1将请求加入BufferTxQueue2，后台线程打印时先检查RxQueue1中的数量&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;&lt;font color=&quot;#00ff00&quot;&gt;①若Rx队列数量大于0，则打印Rx内容，并将TxQueue1中的第一条（若存在，认为是该条对应的请求）取出（但不打印，已经打印过）并执行下一次循环&lt;span&gt;（Sleep(1)）&lt;/span&gt;&lt;span&gt;；&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#00ff00&quot;&gt;②若Rx队列数量为0（则表示无响应内容需要打印），则检查TxQueue1，若检查到数量为1，表示这一条在等待回复，继续下一次循环（Sleep(1)）；若数量等于0，则从&lt;span&gt;BufferTxQueue2取出一条（若存在）进行打印，并将该条加入到TxQueue1等待序列进行等待（等待收到响应后才会被取出），并执行下一次循环&lt;/span&gt;&lt;span&gt;（Sleep(1)）。&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;问题二（待解决）：&lt;/div&gt;&lt;div&gt;2.用户点击两次不同按键发送不同指令，第一次Click1对应的Task1执行了一条耗时指令（比如2s后返回超时），第二次Click2对应的Task2执行了一条很快返回的指令（1s内），这种情况下上位机就会出现仅打印第二条响应的情况。&lt;/div&gt;&lt;div&gt;——解决方法：&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#ff0000&quot;&gt;①首先怀疑了是不是Lib和下位机未发送响应事件，调试后发现如背景3红字所示，即第二条指令是在第一条第一条超时后才发出，并且库中触发了两次事件，但上位机RxQueue中只有Taks2的消息（无Task1的超时消息）&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#ff0000&quot;&gt;②检查上位机代码后发现，可能由于第二条指令发送时，创建了Task2，和Task1公用了同一个线程同步标志，可能导致Task2收到响应后对Task1也释放（但站在背景3的角度上又说不过去，Task1应该先一步被释放才对，并且Task2在Task1未收到响应时，应该还卡在调用Lib库发送第二条指令的位置才对）&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#ff0000&quot;&gt;③基于②中的问题，协商后决定传入配置后，发送前先配置库，使其知道接下来要发送哪条子指令的序号，并在响应结果中将是哪条子指令的响应进行记录；同时，上位机亦在不同Task中使用不同的信号同步标志对其精确释放。（后续若Lib和下位机收发指令并解析实现异步，这也是一部分基础）&lt;/font&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;shape=mxgraph.basic.document;align=left;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="940" y="249" width="420" height="491" as="geometry" />
+        </mxCell>
+        <mxCell id="kwHOfy920-eHO_7U4Qhk-66" value="CMD_Group.Count&amp;gt;0" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="283.5" y="610" width="130" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="i1VKlI2cNlGZxlXOtoaH-0" value="背景：&lt;br&gt;1.在V1中，CMD_Setting中单条Instruction改为List容器存放，但调用Lib库去执行单条指令时实际是将List[0]中的Request发送出去；（List无实际意义）&lt;br&gt;2.为满足V1需求，在不修改库的前提下，为达到发送多条指令发送目的，上位机在原有基础上，需要发送指令组中的每条子指令(Sub_CMD)前都先将子指令进行配置；&lt;br&gt;&lt;font color=&quot;#ff0000&quot;&gt;3.Lib和下位机在发送完一条指令后，收到回复之前不会发送下一条指令（同步）&lt;/font&gt;" style="whiteSpace=wrap;html=1;shape=mxgraph.basic.document;align=left;" vertex="1" parent="kwHOfy920-eHO_7U4Qhk-1">
+          <mxGeometry x="940" y="20" width="350" height="130" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
