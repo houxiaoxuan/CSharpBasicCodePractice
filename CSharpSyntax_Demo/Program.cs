@@ -374,6 +374,155 @@ namespace CSharpSyntax_Demo
     }
     */
 
+    #region 继承、封装、多态
+    class A
+    {
+        public void FuncA()
+        {
+            Console.WriteLine("A.A");
+        }
+        public virtual void FuncB()
+        {
+            Console.WriteLine("A.B");
+        }
+        public void FuncC()
+        {
+            Console.WriteLine("A.C");
+        }
+    }
+    class B : A
+    {
+        public new void FuncA()
+        {
+            Console.WriteLine("B.A");
+        }
+        public override void FuncB()//重写后类型B实例中的FuncB函数指针不再指向base.FuncB
+        {
+            Console.WriteLine("B.B");
+        }
+        public new void FuncC()//new出来的和父类同名的函数
+        {
+            Console.WriteLine("B.C");
+        }
+    }
+
+    #endregion
+    #region  C#指针
+    class Test
+    {
+        static void Display(long x) => Console.WriteLine($"{Convert.ToString(x, toBase: 2),100}");
+        public struct Coords
+        {
+            public int X;
+            public int Y;
+            public override string ToString() => $"({X}, {Y})";
+        }
+
+        public class PointerMemberAccessExample
+        {
+            public static unsafe void Main1()
+            {
+                object obj = new object();
+                Coords coords;
+                Coords* p = &coords;
+                p->X = 3;
+                p->Y = 4;
+                p->X += 1;
+                *p = new Coords();
+                Console.WriteLine(p->ToString());  // output: (3, 4)
+            }
+        }
+        static void Main1(string[] args)
+        {
+            A a = new A();
+            a.FuncA();//A.A
+            a.FuncB();//A.B
+            a.FuncC();//A.C
+            B b = new B();
+            b.FuncA();//B.A
+            b.FuncB();//B.B
+            b.FuncC();//B.C
+            A b1 = new B();
+            b1.FuncA();//A.A
+            b1.FuncB();//B.B ->override
+            b1.FuncC();//A.C ->
+
+            //long i0 = 1000_0000_0001_1110;
+            //long i1 = 1000_0000_0001_1110_1111;
+            //long i2 = 0b1000_0000_0001_1110_1111;
+
+            //long i3 = 0100_0000_0001_1110_1111;
+            //long i4 = 0100_0000_0001_1110_1111_1111_1111;
+            //long i5 = 0b0100_0000_0001_1110_1111_1111_1111;
+
+
+            unsafe
+            {
+                const int Count = 3;
+                int[] numbers = new int[Count] { 10, 20, 30 };
+                fixed (int* pointerToFirst = &numbers[0])//&获取对象的地址
+                {
+                    *pointerToFirst += 1;//*获取指针对应的值
+                    int* pointerToLast = pointerToFirst + (Count - 1);
+
+                    Console.WriteLine($"Value {*pointerToFirst} at address {(long)pointerToFirst}");
+                    Console.WriteLine($"Value {*pointerToLast} at address {(long)pointerToLast}");
+                }
+                numbers[0] += 1;
+
+
+            }
+            // Output is similar to:
+            // Value 10 at address 1818345918136
+            // Value 30 at address 1818345918144
+            unsafe
+            {
+                int* numbers = stackalloc int[] { 0, 1, 2, 3, 4, 5 };
+                int* p1 = &numbers[1];
+                int p1_1 = numbers[1];
+                int* p2 = &numbers[5];
+                Console.WriteLine(p2 - p1);  // output: 4
+            }
+            unsafe
+            {
+                char* pointerToChars = stackalloc char[123];
+
+                for (int i = 65; i < 123; i++)
+                {
+                    pointerToChars[i] = (char)i;
+                }
+
+                Console.Write("Uppercase letters: ");
+                for (int i = 0; i < 124; i++)
+                {
+                    Console.Write(pointerToChars[0]);
+                }
+                for (int i = 65; i < 91; i++)
+                {
+                    Console.Write(pointerToChars[i]);
+                }
+            }
+            // Output:
+            // Uppercase letters: ABCDEFGHIJKLMNOPQRSTUVWXYZ
+            unsafe
+            {
+                char letter = 'A';
+                char* pointerToLetter = &letter;
+                Console.WriteLine($"Value of the `letter` variable: {letter}");
+                Console.WriteLine($"Address of the `letter` variable: {(long)pointerToLetter:X}");
+
+                *pointerToLetter = 'Z';
+                Console.WriteLine($"Value of the `letter` variable after update: {letter}");
+            }
+            // Output is similar to:
+            // Value of the `letter` variable: A
+            // Address of the `letter` variable: DCB977DDF4
+            // Value of the `letter` variable after update: Z
+
+            //Display(i0);
+        }
+    }
+    #endregion
     //定义测试方法和异步委托
     public class AsyncDemo
     {
@@ -701,6 +850,142 @@ namespace CSharpSyntax_Demo
 
     }
     //4.异步调用完成时执行回调方法
+    #region 可变字段
+    class Test22
+    {
+        public static int result;
+        public static volatile bool finished;
+
+        static void Thread2()
+        {
+            result = 143;
+            finished = true;
+        }
+        static void Cal(double value,out int x,out int y)
+        {
+            //if (value >= 0)
+            //{
+                x = (int)Math.Floor(value);
+                y = (int)((value - x) * 10000);
+            //}
+            //else
+            //{
+            //    x = (int)Math.Ceiling(value);
+            //    y = -(int)((value - x) * 10000);
+            //}
+        }
+
+        /// <summary>
+        /// 负数转十六进制
+        /// </summary>
+        /// <param name="iNumber"></param>
+        /// <returns></returns>
+        private static string NegativeToHexString(int iNumber)
+        {
+            string strResult = string.Empty;
+
+            if (iNumber < 0)
+            {
+                iNumber = -iNumber;
+
+                string strNegate = string.Empty;
+
+                char[] binChar = Convert.ToString(iNumber, 2).PadLeft(8, '0').ToArray();
+
+                foreach (char ch in binChar)
+                {
+                    if (Convert.ToInt32(ch) == 48)
+                    {
+                        strNegate += "1";
+                    }
+                    else
+                    {
+                        strNegate += "0";
+                    }
+                }
+
+                int iComplement = Convert.ToInt32(strNegate, 2) + 1;
+
+                strResult = Convert.ToString(iComplement, 16).ToUpper();
+            }
+
+            return strResult;
+        }
+        static string  Int16ToHex(Int16 value)
+        {
+            //string ret = string.Empty;
+            //string bin = Convert.ToString(value, 2);
+            return  String.Format("{0:X}", value);
+        }
+        private static byte[] ConvertHex(Int16 vel)
+        {
+            Int16 velocity = vel;
+            byte[] hex = new byte[2];
+            hex[0] = (byte)(velocity & 0xff);
+            hex[1] = (byte)((velocity >> 8) & 0xff);   //先右移再与操作
+            //hex[2] = (byte)((velocity >> 16) & 0xff);
+            //hex[3] = (byte)((velocity >> 24) & 0xff);
+            return hex;
+        }
+        static void Main()
+        {
+            Int16 tempHead = (Int16)(1 + 0x37);
+            byte[] b_ret = new byte[1] { Convert.ToByte(tempHead) };
+            int[] args = new int[] { 0, 42, 24, 4994 };
+            foreach (int item in args)
+            {
+                byte[] temp = ConvertHex((Int16)item);
+                b_ret = b_ret.Concat(temp).ToArray();
+            }
+            string e_s =  Encoding.Default.GetString(b_ret);
+            Console.WriteLine("ES="+e_s);
+
+            Decoder decoder = Encoding.Default.GetDecoder();
+            //计算字节数组对应的字符数组长度;
+            byte[] bytes = new byte[e_s.Length];
+            for (int i = 0; i < e_s.Length; i++)
+            {
+                bytes[i] = Convert.ToByte(e_s.ToCharArray()[i]);
+            }
+            int charSize = decoder.GetCharCount(bytes, 0, bytes.Length);
+            Char[] chs = new char[charSize];
+            //进行字符转换;
+            int charLength = decoder.GetChars(bytes, 0, e_s.Length, chs, 0);
+            Console.WriteLine("DS="+new string(chs));
+
+            int x, y = 0;
+            byte[] b=ConvertHex(-2);
+            string ss = NegativeToHexString(-1);
+            ss = NegativeToHexString(-2);
+            ss=Int16ToHex(-1);
+            ss=Int16ToHex(-2);
+            string head = Convert.ToString(-1, 16).ToUpper().PadLeft(4, Convert.ToChar("0"));
+            Cal(1.1,out x,out y);
+            Cal(0.1, out x, out y);
+            Cal(-0.1, out x, out y);
+            Cal(-1.1, out x, out y);
+            finished = false;
+
+            // Run Thread2() in a new thread
+            new Thread(new ThreadStart(Thread2)).Start();
+
+            // Wait for Thread2 to signal that it has a result by setting
+            // finished to true.
+            for (; ; )
+            {
+                if (finished)
+                {
+                    Console.WriteLine("result = {0}", result);
+                    return;
+                }
+                else
+                {
+                    Console.WriteLine("wait...");
+                }
+            }
+        }
+    }
+    #endregion
 }
 
 
